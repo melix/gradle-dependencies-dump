@@ -1,0 +1,46 @@
+/**
+ * This script is an init script which can be added to the invocation
+ * of any Gradle command, via the -I command-line flag.
+ *
+ * It will "patch" the projects and insert a task in each project
+ * which generates a JSON file containing the dependency graph in their
+ * build/ directory.
+ *
+ * Alternatively, this script can be applied in the root project
+ * of any project from a remote repository using the:
+ *
+ * apply from: "https://raw.githubusercontent.com/melix/gradle-dependencies-dump/main/init/init.gradle"
+ */
+import groovy.json.JsonOutput
+
+Map<String, Object> walk(DependencyResult dep, Set<DependencyResult> seen) {
+    Map<String, Object> result = [:]
+    result['requested'] = dep.requested.displayName
+    if (dep instanceof ResolvedDependencyResult) {
+        result['resolved'] = dep.resolvedVariant.owner.displayName
+        if (seen.add(dep)) {
+            def dependencies = dep.selected.dependencies.collect { walk(it, seen) }
+            result['dependencies'] = dependencies
+        } else {
+            result['seen'] = true
+        }
+    } else {
+        result['resolved'] = '<unresolved>'
+    }
+
+    return result
+}
+
+allprojects {
+    tasks.register("generateDependencyGraph") {
+        def result = [:]
+        configurations.all { Configuration conf ->
+            // Restrict configurations to those which
+            // are actually resolvable
+            if (conf.canBeResolved) {
+                result[conf.name] = conf.incoming.resolutionResult.root.dependencies.collect { walk(it, [] as Set) }
+            }
+        }
+        layout.buildDirectory.file("dependency-graph.json").get().asFile.text = JsonOutput.prettyPrint(JsonOutput.toJson(result))
+    }
+}

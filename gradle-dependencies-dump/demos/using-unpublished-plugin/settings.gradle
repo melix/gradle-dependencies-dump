@@ -1,0 +1,11 @@
+plugins {
+    id 'me.champeau.includegit' version '0.1.5'
+}
+rootProject.name="using-plugin"
+
+gitRepositories {
+    include('gradle-dependencies-dump') {
+        uri = 'git@github.com:melix/gradle-dependencies-dump.git'
+        branch = 'main'
+    }
+}
